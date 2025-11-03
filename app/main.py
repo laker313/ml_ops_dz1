@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.api.all_models_handler import router as models_router 
 
 # Настройки прямо здесь
 PROJECT_NAME = "My Project"
@@ -9,14 +10,12 @@ app = FastAPI(
     openapi_url=f"{API_V1_STR}/openapi.json"
 )
 
+
+app.include_router(models_router, prefix=API_V1_STR)
 # Если роутеров нет, можно оставить основной маршрут
 @app.get("/")
 def read_root():
     return {"message": "Hello World"}
-
-# @app.get("/123/")
-# def read_root():
-#     return {"message": "Hello World123"}
 
 if __name__ == "__main__":
     import uvicorn
