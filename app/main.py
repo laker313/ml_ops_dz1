@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from app.api.all_models_handler import router as models_router 
+from ml_ops_dz1.app.api.models_handler import router as models_router 
+from ml_ops_dz1.app.api.dataset_handler import router as dataset_router 
 
 # Настройки прямо здесь
 PROJECT_NAME = "My Project"
@@ -12,6 +13,7 @@ app = FastAPI(
 
 
 app.include_router(models_router, prefix=API_V1_STR)
+app.include_router(dataset_router, prefix=API_V1_STR)
 # Если роутеров нет, можно оставить основной маршрут
 @app.get("/")
 def read_root():
