@@ -1,25 +1,55 @@
-from fastapi import FastAPI, File, Response, UploadFile, Form, HTTPException, APIRouter
-from scipy import io
+
 from app.models.models import MODEL_CLASSES, Models
 from app.data_storage.mino.model_storage import delete_model_from_minio, save_model_to_minio, read_model_from_minio, update_model_to_minio
 from app.data_storage.mino.datasets_storage import read_dataset_from_minio
+from app.api.dataset_handler import format_validation, read_pd_from_format
+from app.data_storage.model.model_status import Learning_status
 from enum import Enum
 from typing import Dict, Any
 from pydantic import BaseModel
 import pandas as pd
+import io
+import json
+from fastapi import FastAPI, File, Response, UploadFile, Form, HTTPException, APIRouter
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
+from functools import wraps
 
-from ml_ops_dz1.app.api.dataset_handler import dataset_validation, format_validation, read_pd_from_format
-from ml_ops_dz1.app.data_storage.model.model_status import Learning_status
-
+# Глобальный пул с разумным лимитом
+GLOBAL_THREAD_POOL = ThreadPoolExecutor(max_workers=40, thread_name_prefix="model_worker")
 
 router = APIRouter(prefix="/models", tags=["models"])
 
 
-class ModelRequest(BaseModel):
-    hyperparameters: Dict[str, Any] = {}
-    # Можно добавить другие параметры:
-    # dataset_path: str
-    # validation_split: float = 0.2
+
+
+def async_run_in_pool(func):
+    """Декоратор для запуска синхронных функций в пуле потоков"""
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(GLOBAL_THREAD_POOL, lambda: func(*args, **kwargs))
+    return wrapper
+
+
+@router.get("/health")
+async def health():
+    return {
+        "status": "ok",
+        "workers": len(GLOBAL_THREAD_POOL._threads),
+        "queue_size": GLOBAL_THREAD_POOL._work_queue.qsize()
+    }
+
+
+
+@router.get("/pool_status")
+async def pool_status():
+    return {
+        "max_workers": GLOBAL_THREAD_POOL._max_workers,
+        "active": len(GLOBAL_THREAD_POOL._threads),
+        "queue": GLOBAL_THREAD_POOL._work_queue.qsize(),
+    }
+
 
 @router.get("/type_list")
 async def get_all_models():
@@ -27,120 +57,129 @@ async def get_all_models():
     return {"message": model_list}
 
 
-
 @router.post("/create_and_save_model")
-async def create_and_save_model(
-    model_name: str,
-    task_type: str,
-    request: ModelRequest
+@async_run_in_pool
+def create_and_save_model(
+    model_name: str = Form(...),
+    task_type: str = Form(...),
+    hyperparameters: str = Form("{}")
 ):
 
     """Создать и обучить модель с указанными гиперпараметрами"""
     try:
+        params = json.loads(hyperparameters)
         validate_model_name_classifier(model_name, task_type)
-        validate_hyperparams(model_name, task_type, request.hyperparameters)
+        validate_hyperparams(model_name, task_type, params)
         # Создаем модель с гиперпараметрами
         model = create_model(
             model_name=model_name,
             task_type=task_type,  # или из запроса
-            **request.hyperparameters
+            **params
         )
         
-        model_id = save_model_to_minio(model, model_name, request.hyperparameters)
+        model_id = save_model_to_minio(model, model_name, params)
 
         
         return {
             "status": "saved",
-            "model_name": request.model_name,
-            "hyperparameters": request.hyperparameters,
+            "model_name": model_name,
+            "hyperparameters": params,
             "model_type": type(model).__name__,
             "model_id": model_id
         }
         
-    except TypeError or ValueError as e:
+    except (TypeError, ValueError) as e:
         # Ошибка в гиперпараметрах
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid hyperparameters for {request.model_name}: {str(e)}"
+            detail=f"Invalid hyperparameters for {model_name}: {str(e)}"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-
 @router.post("/learn_model")
-async def learn_model(
-    model_id: str,
-    data_id: str
+@async_run_in_pool
+def learn_model(
+    model_id: str = Form(...),
+    data_id: str = Form(...)
 ):
     try:
-        model = read_model_from_minio(model_id)
-
+        resp = read_model_from_minio(model_id)
+        model = resp["model"]
+        hyperparams = resp["hyperparams"]
+        model_name = resp["model_name"]
         dataset = pd.read_parquet(io.BytesIO(read_dataset_from_minio(data_id)))
         # Здесь логика обучения модели
+        if "target" not in dataset.columns:
+            raise HTTPException(status_code=400, detail="Dataset must contain a 'target' column for training.")
+
         X = dataset.drop(columns=["target"])
         y = dataset["target"]
         model.fit(X, y)
 
-        update_model_to_minio(model, model_id, model_id.model_name, {}, Learning_status.LEARNED)
+        update_model_to_minio(model, model_id, model_name, hyperparams, Learning_status.LEARNED)
         return {
             "status": f"model_{model_id}_learned_with_data_{data_id}",
-            "model_type": type(model).__name__,
+            "model_type": model_name,
             "model_id": model_id
         }
         
-    except TypeError or ValueError as e:
+    except (TypeError, ValueError) as e:
         # Ошибка в гиперпараметрах
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid data for {model_id.model_name}: {str(e)}"
+            detail=f"Invalid data for {type(model).__name__}: {str(e)}"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
 @router.post("/update_model")
-async def create_and_save_model(
-    model_name: str,
-    task_type: str,
-    request: ModelRequest
+@async_run_in_pool
+def update_model(
+    model_name: str = Form(...),
+    task_type: str = Form(...),
+    hyperparameters: str = Form("{}")
 ):
 
     """Создать и обучить модель с указанными гиперпараметрами"""
     try:
+        params = json.loads(hyperparameters)
         validate_model_name_classifier(model_name, task_type)
-        validate_hyperparams(model_name, task_type, request.hyperparameters)
+        validate_hyperparams(model_name, task_type, params)
         # Создаем модель с гиперпараметрами
         model = create_model(
             model_name=model_name,
             task_type=task_type,
-            **request.hyperparameters
+            **params
         )
         
-        model_id = update_model_to_minio(model, model_name, request.hyperparameters, Learning_status.NOT_LEARNED)
+        model_id = update_model_to_minio(model, model_name, params, Learning_status.NOT_LEARNED)
 
         
         return {
             "status": "model_updated",
-            "model_name": request.model_name,
-            "hyperparameters": request.hyperparameters,
+            "model_name": model_name,
+            "hyperparameters": params,
             "model_type": type(model).__name__,
             "model_id": model_id
         }
         
-    except TypeError or ValueError as e:
+    except (TypeError, ValueError) as e:
         # Ошибка в гиперпараметрах
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid hyperparameters for {request.model_name}: {str(e)}"
+            detail=f"Invalid hyperparameters for {model_name}: {str(e)}"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
 
 
-
 @router.post("/delete_model")
-async def delete_model(
-    model_id: str
+@async_run_in_pool
+def delete_model(
+    model_id: str = Form(...)
 ):
 
     """Создать и обучить модель с указанными гиперпараметрами"""
@@ -155,10 +194,10 @@ async def delete_model(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.post("/get_predictions_from_file")
-async def learn_model(
-    model_id: str,
+@async_run_in_pool
+def get_predictions_from_file(
+    model_id: str = Form(...),
     file: UploadFile = File(...)
 ):
     try:
@@ -170,9 +209,12 @@ async def learn_model(
         file_format = format_validation(file)
         try:
             # Читаем файл
-            dataset = await read_pd_from_format(file, file_format)
-            dataset["target"] = 0  # Заглушка для совместимости
-            dataset_X = dataset.drop(columns=["target"])
+            dataset = read_pd_from_format(file, file_format)
+            # dataset["target"] = 0  # Заглушка для совместимости
+            if "target" in dataset.columns:
+                dataset_X = dataset.drop(columns=["target"])
+            else:
+                dataset_X = dataset
             predictions = model.predict(dataset_X)
             # dataset_validation(dataset) наверное нужна но пока не знаю какая
             dataset_bytes = io.BytesIO()
@@ -180,18 +222,18 @@ async def learn_model(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error reading input file: {str(e)}")
         return Response(
-            content=dataset_bytes,
+            content=dataset_bytes.getvalue(),
             media_type="application/parquet",
             headers={
-                "Content-Disposition": f"attachment; filename={file.filename}.parquet"
+                "Content-Disposition": f"attachment; filename=ans.parquet"
             }
         )
         
-    except TypeError or ValueError as e:
+    except (TypeError, ValueError) as e:
         # Ошибка в гиперпараметрах
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid data for {model_id.model_name}: {str(e)}"
+            detail=f"Invalid data for {type(model).__name__}: {str(e)}"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -232,8 +274,8 @@ def validate_model_name_classifier(model_name, task_type):
         raise ValueError(f"Task type {task_type} not supported for {model_name}")
 
 def validate_hyperparams(model_name, task_type,params):
+    default_params = get_model_default_params(model_name, task_type)
     for param in params:
-        default_params = get_model_default_params(model_name, task_type)
         if param not in default_params:
             raise ValueError(f"Hyperparameter {param} not valid for {model_name} with task {task_type}")
 

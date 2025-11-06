@@ -133,5 +133,4 @@ def delete_dataset_from_minio(dataset_id: str) -> bool:
         print(f"dataset {object_name} deleted successfully")
         return True
     except S3Error as e:
-        print(f"Error deleting dataset: {str(e)}")
-        return False
+         raise HTTPException(500, f"Failed to delete dataset to MinIO: {str(e)}")

@@ -1,3 +1,4 @@
+import json
 from minio import Minio
 from minio.error import S3Error
 import pickle
@@ -42,8 +43,8 @@ def save_model_to_minio(model, model_name: str, hyperparameters: dict) -> str:
             "model_name": model_name,
             "model_id": model_id,
             "created_at": datetime.now().isoformat(),
-            "training-status": Learning_status.NOT_LEARNED.value,
-            "hyperparameters": str(hyperparameters)
+            "training_status": Learning_status.NOT_LEARNED.value,
+            "hyperparameters": json.dumps(hyperparameters)
         }
         
         # Загружаем в MinIO
@@ -71,7 +72,11 @@ def read_model_from_minio(model_id: str) -> dict:
         # Получаем объект из MinIO
         response = client.get_object(MODEL_BUCKET, object_name)
         model_bytes = response.read()
-        status = get_learning_status(response.headers.get("x-amz-meta-training-status"))
+        status_str = response.headers.get("x-amz-meta-training_status")
+        hyperparams_str = response.headers.get("x-amz-meta-hyperparameters")
+
+        status = get_learning_status(status_str)
+        hyperparams = json.loads(hyperparams_str) if hyperparams_str else {}
         
         # Десериализуем модель
         model = pickle.loads(model_bytes)
@@ -81,14 +86,20 @@ def read_model_from_minio(model_id: str) -> dict:
             "status": "success",
             "model_id": model_id,
             "model": model,
+            "model_name": response.headers.get("x-amz-meta-model_name"),
             "learning_status": status,
-            "learning_status_str": status.value
+            "learning_status_str": status.value,
+            "hyperparams": hyperparams
         }
+
         
     except S3Error as e:
         raise HTTPException(404, f"Model not found: {str(e)}")
     except Exception as e:
         raise HTTPException(500, f"Error loading model: {str(e)}")
+    finally:
+        response.close()
+        response.release_conn()
 
 
 def update_model_to_minio(model, model_id: str, model_name: str, hyperparameters: dict, training_status: Learning_status) -> str:
@@ -113,8 +124,8 @@ def update_model_to_minio(model, model_id: str, model_name: str, hyperparameters
             "model_name": model_name,
             "model_id": model_id,
             "created_at": datetime.now().isoformat(),
-            "training-status": Learning_status.NOT_LEARNED.value,
-            "hyperparameters": str(hyperparameters)
+            "training_status": training_status.value,
+            "hyperparameters": json.dumps(hyperparameters)
         }
         
         # Загружаем в MinIO

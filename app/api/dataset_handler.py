@@ -13,15 +13,9 @@ import pandas as pd
 from app.data_storage.mino.datasets_storage import save_dataset_to_minio, update_dataset_to_minio
 import io
 from app.data_storage.mino.datasets_storage import delete_dataset_from_minio, read_dataset_from_minio
+from app.api.models_handler import async_run_in_pool
 
 router = APIRouter(prefix="/data", tags=["data"])
-
-
-class DataUploadRequest(BaseModel):
-    dataset_name: str
-    # Можно добавить другие параметры:
-    # description: str
-    # tags: List[str]
 
 
 
@@ -50,7 +44,8 @@ SUPPORTED_FORMATS = {
 
 
 @router.post("/upload_dataset")
-async def upload_dataset(
+@async_run_in_pool
+def upload_dataset(
     file: UploadFile = File(...)
 ):
     """Загрузить набор данных в хранилище"""
@@ -59,16 +54,14 @@ async def upload_dataset(
         raise HTTPException(status_code=400, detail="Filename is required")
     
     # Определяем формат
-    file_format = determine_file_format(file.filename, file.content_type)
+    file_format = determine_file_format(file.filename)
     if file_format not in SUPPORTED_FORMATS:
         raise HTTPException(
             status_code=400, 
             detail=f"Unsupported file format. Supported: {list(SUPPORTED_FORMATS.keys())}")
     try:
         # Читаем файл
-        content = await file.read()
-        file_bytes = io.BytesIO(content)
-        dataset = SUPPORTED_FORMATS[file_format]['reader'](file_bytes)
+        dataset = read_pd_from_format(file, file_format)
         dataset_validation(dataset)
         
         dataset_id = save_dataset_to_minio(dataset, file.filename)
@@ -83,15 +76,16 @@ async def upload_dataset(
     
 
 
-@router.post("/udate_dataset")
-async def udate_dataset(
+@router.post("/update_dataset")
+@async_run_in_pool
+def update_dataset(
     file: UploadFile = File(...),
     dataset_id: str = Form(...)
 ):
     file_format = format_validation(file)
     try:
         # Читаем файл
-        dataset = await read_pd_from_format(file, file_format)
+        dataset = read_pd_from_format(file, file_format)
         dataset_validation(dataset)
         
         dataset_id = update_dataset_to_minio(dataset, dataset_id, file.filename)
@@ -104,8 +98,17 @@ async def udate_dataset(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-async def read_pd_from_format(file, file_format) -> pd.DataFrame:
-    content = await file.read()
+
+
+
+
+
+
+
+
+
+def read_pd_from_format(file, file_format) -> pd.DataFrame:
+    content = file.read()
     file_bytes = io.BytesIO(content)
     dataset = SUPPORTED_FORMATS[file_format]['reader'](file_bytes)
     return dataset
@@ -117,7 +120,7 @@ def format_validation(file):
         raise HTTPException(status_code=400, detail="Filename is required")
     
     # Определяем формат
-    file_format = determine_file_format(file.filename, file.content_type)
+    file_format = determine_file_format(file.filename)
     if file_format not in SUPPORTED_FORMATS:
         raise HTTPException(
             status_code=400, 
@@ -125,9 +128,9 @@ def format_validation(file):
             
     return file_format
     
-
 @router.post("/download_dataset")
-async def download_dataset(
+@async_run_in_pool
+def download_dataset(
     dataset_id: str = Form(...)
 ):
     """Загрузить набор данных в хранилище"""
@@ -147,9 +150,9 @@ async def download_dataset(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 @router.post("/delete_dataset")
-async def delete_dataset(
+@async_run_in_pool
+def delete_dataset(
     dataset_id: str = Form(...)
 ):
 
@@ -203,5 +206,3 @@ def dataset_validation(dataset: pd.DataFrame):
     # Проверяем что нет пропущенных значений
     if target_col.isnull().any():
         raise ValueError("Target column contains missing values")
-    
-
