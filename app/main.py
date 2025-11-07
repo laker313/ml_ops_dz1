@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from ml_ops_dz1.app.api.models_handler import router as models_router 
-from ml_ops_dz1.app.api.dataset_handler import router as dataset_router 
+from app.api.models_handler import router as models_router
+from app.api.dataset_handler import router as dataset_router
 
 # Настройки прямо здесь
 PROJECT_NAME = "My Project"

@@ -23,6 +23,7 @@ services:
       - "8000"
     networks:
       - webnet
+      - appnet
   nginx:
     image: nginx:alpine
     ports:
@@ -58,9 +59,14 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
+    networks:
+      - appnet
 
 volumes:
   postgres_data:
   minio_data:
 networks:
   webnet:
+    driver: bridge
+  appnet:
+    driver: bridge 

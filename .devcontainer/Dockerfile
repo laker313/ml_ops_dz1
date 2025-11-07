@@ -1,10 +1,14 @@
 FROM python:3.11-slim
 
 # Установка инструментов разработки
-# RUN apt-get update && apt-get install -y \
-#     git curl wget build-essential \
-#     postgresql-client \
-#     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    libgomp1 \
+    libgfortran5 \
+    libstdc++6 \
+    libopenblas-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
 

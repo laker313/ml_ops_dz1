@@ -14,22 +14,11 @@ from fastapi import FastAPI, File, Response, UploadFile, Form, HTTPException, AP
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 from functools import wraps
+from app.api.utils import async_run_in_pool, GLOBAL_THREAD_POOL
 
-# Глобальный пул с разумным лимитом
-GLOBAL_THREAD_POOL = ThreadPoolExecutor(max_workers=40, thread_name_prefix="model_worker")
 
 router = APIRouter(prefix="/models", tags=["models"])
 
-
-
-
-def async_run_in_pool(func):
-    """Декоратор для запуска синхронных функций в пуле потоков"""
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(GLOBAL_THREAD_POOL, lambda: func(*args, **kwargs))
-    return wrapper
 
 
 @router.get("/health")
@@ -58,8 +47,7 @@ async def get_all_models():
 
 
 @router.post("/create_and_save_model")
-@async_run_in_pool
-def create_and_save_model(
+async def create_and_save_model(
     model_name: str = Form(...),
     task_type: str = Form(...),
     hyperparameters: str = Form("{}")
@@ -77,7 +65,7 @@ def create_and_save_model(
             **params
         )
         
-        model_id = save_model_to_minio(model, model_name, params)
+        model_id = await async_run_in_pool(save_model_to_minio,model, model_name, params)
 
         
         return {
@@ -98,26 +86,26 @@ def create_and_save_model(
         raise HTTPException(status_code=500, detail=str(e))
     
 @router.post("/learn_model")
-@async_run_in_pool
-def learn_model(
+async def learn_model(
     model_id: str = Form(...),
     data_id: str = Form(...)
 ):
     try:
-        resp = read_model_from_minio(model_id)
+        resp = await async_run_in_pool(read_model_from_minio, model_id)
         model = resp["model"]
         hyperparams = resp["hyperparams"]
         model_name = resp["model_name"]
-        dataset = pd.read_parquet(io.BytesIO(read_dataset_from_minio(data_id)))
+        dataset_bytes = await async_run_in_pool(read_dataset_from_minio, data_id)
+        dataset = pd.read_parquet(io.BytesIO(dataset_bytes))
         # Здесь логика обучения модели
         if "target" not in dataset.columns:
             raise HTTPException(status_code=400, detail="Dataset must contain a 'target' column for training.")
 
         X = dataset.drop(columns=["target"])
         y = dataset["target"]
-        model.fit(X, y)
+        await async_run_in_pool(model.fit, X, y)
 
-        update_model_to_minio(model, model_id, model_name, hyperparams, Learning_status.LEARNED)
+        await async_run_in_pool(update_model_to_minio,model, model_id, model_name, hyperparams, Learning_status.LEARNED)
         return {
             "status": f"model_{model_id}_learned_with_data_{data_id}",
             "model_type": model_name,
@@ -135,8 +123,7 @@ def learn_model(
 
 
 @router.post("/update_model")
-@async_run_in_pool
-def update_model(
+async def update_model(
     model_name: str = Form(...),
     task_type: str = Form(...),
     hyperparameters: str = Form("{}")
@@ -154,7 +141,7 @@ def update_model(
             **params
         )
         
-        model_id = update_model_to_minio(model, model_name, params, Learning_status.NOT_LEARNED)
+        model_id = await async_run_in_pool(update_model_to_minio, model, model_name, params, Learning_status.NOT_LEARNED)
 
         
         return {
@@ -177,14 +164,13 @@ def update_model(
 
 
 @router.post("/delete_model")
-@async_run_in_pool
-def delete_model(
+async def delete_model(
     model_id: str = Form(...)
 ):
 
-    """Создать и обучить модель с указанными гиперпараметрами"""
+    """Удалить модель"""
     try:
-        deleted = delete_model_from_minio(model_id)
+        await async_run_in_pool(delete_model_from_minio, model_id)
 
         
         return {
@@ -195,30 +181,34 @@ def delete_model(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/get_predictions_from_file")
-@async_run_in_pool
-def get_predictions_from_file(
+async def get_predictions_from_file(
     model_id: str = Form(...),
     file: UploadFile = File(...)
 ):
     try:
-        resp = read_model_from_minio(model_id)
+        content = await file.read()
+        file_name = file.filename
+        file_format = format_validation(file_name)
+        resp = await async_run_in_pool(read_model_from_minio, model_id)
         learning_status = resp["learning_status"]
         model = resp["model"]
         if learning_status != Learning_status.LEARNED:
             raise ValueError(f"Model {model_id} is not learned yet.")
-        file_format = format_validation(file)
+        
         try:
             # Читаем файл
-            dataset = read_pd_from_format(file, file_format)
+            dataset = await async_run_in_pool(read_pd_from_format, content, file_format)
             # dataset["target"] = 0  # Заглушка для совместимости
             if "target" in dataset.columns:
                 dataset_X = dataset.drop(columns=["target"])
             else:
                 dataset_X = dataset
-            predictions = model.predict(dataset_X)
+            predictions = await async_run_in_pool(model.predict,dataset_X)
             # dataset_validation(dataset) наверное нужна но пока не знаю какая
             dataset_bytes = io.BytesIO()
-            pd.DataFrame(predictions, columns=["predictions"]).to_parquet(dataset_bytes, engine='pyarrow', index=False)
+            await async_run_in_pool(lambda: pd.DataFrame(predictions, columns=["predictions"]).
+                                    to_parquet(dataset_bytes, engine='pyarrow', index=False)
+)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error reading input file: {str(e)}")
         return Response(
@@ -299,12 +289,4 @@ def get_model_hyperparameters(model_name: str, task_type: str = 'classifier'):
         }
     except Exception as e:
         # print(f"Error getting parameters for {model_name}: {str(e)}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error getting parameters for {model_name}: {str(e)}"
-        )
-
-
-
-
-
+        raise ValueError(f"Error getting parameters for {model_name}: {str(e)}")

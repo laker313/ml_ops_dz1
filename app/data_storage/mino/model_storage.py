@@ -60,8 +60,8 @@ def save_model_to_minio(model, model_name: str, hyperparameters: dict) -> str:
         print(f"Model saved to MinIO: {object_name}")
         return model_id
         
-    except S3Error as e:
-        raise HTTPException(500, f"Failed to save model to MinIO: {str(e)}") 
+    except Exception as e:
+        raise S3Error(f"Failed to save model to MinIO: {str(e)}") 
 
 def read_model_from_minio(model_id: str) -> dict:
     """Загрузить модель из MinIO по ID"""
@@ -94,9 +94,9 @@ def read_model_from_minio(model_id: str) -> dict:
 
         
     except S3Error as e:
-        raise HTTPException(404, f"Model not found: {str(e)}")
+        raise S3Error(f"Model not found: {str(e)}")
     except Exception as e:
-        raise HTTPException(500, f"Error loading model: {str(e)}")
+        raise S3Error(f"Error loading model: {str(e)}")
     finally:
         response.close()
         response.release_conn()
@@ -138,11 +138,12 @@ def update_model_to_minio(model, model_id: str, model_name: str, hyperparameters
             metadata=metadata
         )
         
+        
         print(f"Model saved to MinIO: {object_name}")
         return model_id
         
-    except S3Error as e:
-        raise HTTPException(500, f"Failed to save model to MinIO: {str(e)}") 
+    except Exception as e:
+        raise S3Error(f"Failed to save model to MinIO: {str(e)}") 
 
 
 def delete_model_from_minio(model_id: str) -> bool:
@@ -154,6 +155,6 @@ def delete_model_from_minio(model_id: str) -> bool:
         client.remove_object(MODEL_BUCKET, object_name)
         print(f"Model {object_name} deleted successfully")
         return True
-    except S3Error as e:
+    except Exception as e:
         print(f"Error deleting model: {str(e)}")
-        return False
+        raise S3Error(f"Failed to remove model to MinIO: {str(e)}") 

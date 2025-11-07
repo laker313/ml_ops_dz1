@@ -56,8 +56,8 @@ def save_dataset_to_minio(dataset:pd.DataFrame, dataset_name: str) -> str:
         print(f"dataset saved to MinIO: {object_name}")
         return dataset_id
         
-    except S3Error as e:
-        raise HTTPException(500, f"Failed to save dataset to MinIO: {str(e)}")
+    except Exception as e:
+        raise S3Error(f"Failed to save dataset to MinIO: {str(e)}")
 
 
 def read_dataset_from_minio(dataset_id: str) -> bytes:
@@ -68,6 +68,9 @@ def read_dataset_from_minio(dataset_id: str) -> bytes:
     
     try:
         return response.read()
+    except Exception as e:
+        raise S3Error(f"Failed to read dataset from MinIO: {str(e)}")
+
     
     finally:
         response.close()
@@ -119,8 +122,8 @@ def update_dataset_to_minio(dataset:pd.DataFrame, dataset_id: str, dataset_name:
         print(f"dataset saved to MinIO: {object_name}")
         return dataset_id
         
-    except S3Error as e:
-        raise HTTPException(500, f"Failed to save dataset to MinIO: {str(e)}")
+    except Exception as e:
+        raise S3Error(f"Failed to save dataset to MinIO: {str(e)}")
 
 
 def delete_dataset_from_minio(dataset_id: str) -> bool:
@@ -132,5 +135,5 @@ def delete_dataset_from_minio(dataset_id: str) -> bool:
         client.remove_object(DATASETS_BUCKET, object_name)
         print(f"dataset {object_name} deleted successfully")
         return True
-    except S3Error as e:
-         raise HTTPException(500, f"Failed to delete dataset to MinIO: {str(e)}")
+    except Exception as e:
+         raise S3Error(f"Failed to delete dataset to MinIO: {str(e)}")
