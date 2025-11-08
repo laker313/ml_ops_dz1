@@ -1,0 +1,19 @@
+# pyproject.toml в ml_ops_dz1
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ml_ops_models_dz"
+version = "0.1.0"
+dependencies = [
+    "catboost",
+    "lightgbm",
+    "xgboost", 
+    "scikit-learn",
+    "pandas",
+    "numpy"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]

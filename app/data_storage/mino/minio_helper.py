@@ -8,7 +8,7 @@ MINIO_CONFIG = {
     "endpoint": "minio:9000",
     "access_key": "minioadmin",
     "secret_key": "minioadmin",
-    "secure": False  # HTTP, не HTTPS
+    "secure": False
 }
 
 

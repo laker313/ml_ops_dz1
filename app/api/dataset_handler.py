@@ -130,13 +130,19 @@ async def download_dataset(
     try:
         # Читаем файл
         dataset_bytes = await async_run_in_pool(read_dataset_from_minio, dataset_id)
+                # Конвертируем parquet в pandas DataFrame
+        dataset = pd.read_parquet(io.BytesIO(dataset_bytes))
         
+        # Конвертируем DataFrame в CSV
+        csv_bytes = io.BytesIO()
+        dataset.to_csv(csv_bytes, index=False)
+        csv_bytes.seek(0)
         
         return Response(
-            content=dataset_bytes,
-            media_type="application/parquet",
+            content=csv_bytes.getvalue(),
+            media_type="text/csv",
             headers={
-                "Content-Disposition": f"attachment; filename={dataset_id}.parquet"
+                "Content-Disposition": f"attachment; filename={dataset_id}.csv"
             }
         )
     except Exception as e:

@@ -16,9 +16,6 @@ services:
     depends_on:
       - db
       - minio
-    # УБИРАЕМ проброс порта 8000 наружу!
-    # ports:
-    #   - "8000:8000"  # ← ЭТУ СТРОКУ УДАЛИТЬ
     expose:
       - "8000"
     networks:
@@ -35,14 +32,14 @@ services:
       - app
     networks:
       - webnet
-  db:
+  db: # это на случай если будет аутентификация
     image: postgres:15-alpine
     environment:
       POSTGRES_DB: mldb
       POSTGRES_USER: developer
       POSTGRES_PASSWORD: password
     ports:
-      - "5432:5432"
+      - "5432:5432" # оставяю так как это не прод
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -55,8 +52,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9000:9000" # оставяю так как это не прод
+      - "9001:9001" # оставяю так как это не прод
     volumes:
       - minio_data:/data
     networks:

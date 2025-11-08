@@ -205,17 +205,19 @@ async def get_predictions_from_file(
                 dataset_X = dataset
             predictions = await async_run_in_pool(model.predict,dataset_X)
             # dataset_validation(dataset) наверное нужна но пока не знаю какая
-            dataset_bytes = io.BytesIO()
+            csv_bytes = io.BytesIO()
+            dataset.to_csv(csv_bytes, index=False)
+            csv_bytes.seek(0)
             await async_run_in_pool(lambda: pd.DataFrame(predictions, columns=["predictions"]).
-                                    to_parquet(dataset_bytes, engine='pyarrow', index=False)
+                                    to_csv(csv_bytes, index=False)
 )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error reading input file: {str(e)}")
         return Response(
-            content=dataset_bytes.getvalue(),
-            media_type="application/parquet",
+            content=csv_bytes.getvalue(),
+            media_type="text/csv",
             headers={
-                "Content-Disposition": f"attachment; filename=ans.parquet"
+                "Content-Disposition": f"attachment; filename=ans.csv"
             }
         )
         
@@ -228,6 +230,25 @@ async def get_predictions_from_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/get_model")
+async def get_predictions_from_file(
+    model_id: str = Form(...)
+):
+    try:
+        resp = await async_run_in_pool(read_model_from_minio, model_id)
+
+        
+
+
+        return {
+            "model_id": model_id,
+            "model_name": resp["model_name"],
+            "learning_status": resp["learning_status"],
+            "hyperparams": resp["hyperparams"]
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading input file: {str(e)}")
 
 
 def get_model_default_params(model_name: str, task_type: str = 'classifier') -> Dict[str, Any]:
