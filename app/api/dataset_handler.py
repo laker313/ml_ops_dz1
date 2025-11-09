@@ -13,6 +13,7 @@ from app.data_storage.mino.datasets_storage import save_dataset_to_minio, update
 import io
 from app.data_storage.mino.datasets_storage import delete_dataset_from_minio, read_dataset_from_minio
 from app.api.utils import async_run_in_pool
+from app.logger.logger import log_endpoint
 
 router = APIRouter(prefix="/data", tags=["data"])
 
@@ -43,6 +44,7 @@ SUPPORTED_FORMATS = {
 
 
 @router.post("/upload_dataset")
+@log_endpoint
 async def upload_dataset(
     file: UploadFile = File(...)
 ):
@@ -72,6 +74,7 @@ async def upload_dataset(
 
 
 @router.post("/update_dataset")
+@log_endpoint
 async def update_dataset(
     file: UploadFile = File(...),
     dataset_id: str = Form(...)
@@ -123,6 +126,7 @@ def format_validation(file_name):
     return file_format
     
 @router.post("/download_dataset")
+@log_endpoint
 async def download_dataset(
     dataset_id: str = Form(...)
 ):
@@ -150,6 +154,7 @@ async def download_dataset(
 
 
 @router.post("/delete_dataset")
+@log_endpoint
 async def delete_dataset(
     dataset_id: str = Form(...)
 ):

@@ -6,3 +6,4 @@ __pycache__/
 *.pyd
 .devcontainer/devcontainer.json
 catboost_info/
+logs/*

@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import HTTPException
 from app.data_storage.model.model_status import Learning_status, get_learning_status
 from app.data_storage.mino.minio_helper import get_minio_client,ensure_bucket_exists, generate_datatime_uuid4_id
+from app.logger.logger import log_minio_model
 
 
 # Конфигурация MinIO
@@ -20,6 +21,8 @@ MINIO_CONFIG = {
 
 MODEL_BUCKET = "ml-models"
 
+
+@log_minio_model
 def save_model_to_minio(model, model_name: str, hyperparameters: dict) -> str:
     """
     Сохранить модель в MinIO и вернуть ID модели
@@ -63,6 +66,7 @@ def save_model_to_minio(model, model_name: str, hyperparameters: dict) -> str:
     except Exception as e:
         raise S3Error(f"Failed to save model to MinIO: {str(e)}") 
 
+@log_minio_model
 def read_model_from_minio(model_id: str) -> dict:
     """Загрузить модель из MinIO по ID"""
     try:
@@ -101,7 +105,7 @@ def read_model_from_minio(model_id: str) -> dict:
         response.close()
         response.release_conn()
 
-
+@log_minio_model
 def update_model_to_minio(model, model_id: str, model_name: str, hyperparameters: dict, training_status: Learning_status) -> str:
     """
     Сохранить модель в MinIO и вернуть ID модели
@@ -145,7 +149,7 @@ def update_model_to_minio(model, model_id: str, model_name: str, hyperparameters
     except Exception as e:
         raise S3Error(f"Failed to save model to MinIO: {str(e)}") 
 
-
+@log_minio_model
 def delete_model_from_minio(model_id: str) -> bool:
     """Удалить модель из MinIO"""
     client = get_minio_client()

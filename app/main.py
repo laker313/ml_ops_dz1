@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from app.api.models_handler import router as models_router
 from app.api.dataset_handler import router as dataset_router
+from app.logger.logger import setup_logging
 
 # Настройки прямо здесь
 PROJECT_NAME = "ML_OPS_DZ1"
 API_V1_STR = "/api/v1"
-
+setup_logging()
 app = FastAPI(
     title=PROJECT_NAME,
     openapi_url=f"{API_V1_STR}/openapi.json",

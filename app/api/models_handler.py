@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 import asyncio
 from functools import wraps
 from app.api.utils import async_run_in_pool, GLOBAL_THREAD_POOL
+from app.logger.logger import log_endpoint
 
 
 router = APIRouter(prefix="/models", tags=["models"])
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/models", tags=["models"])
 
 
 @router.get("/health")
+@log_endpoint
 async def health():
     return {
         "status": "ok",
@@ -32,6 +34,7 @@ async def health():
 
 
 @router.get("/pool_status")
+@log_endpoint
 async def pool_status():
     return {
         "max_workers": GLOBAL_THREAD_POOL._max_workers,
@@ -41,12 +44,14 @@ async def pool_status():
 
 
 @router.get("/type_list")
+@log_endpoint
 async def get_all_models():
     model_list = [model.value for model in Models]
     return {"message": model_list}
 
 
 @router.post("/create_and_save_model")
+@log_endpoint
 async def create_and_save_model(
     model_name: str = Form(...),
     task_type: str = Form(...),
@@ -86,6 +91,7 @@ async def create_and_save_model(
         raise HTTPException(status_code=500, detail=str(e))
     
 @router.post("/learn_model")
+@log_endpoint
 async def learn_model(
     model_id: str = Form(...),
     data_id: str = Form(...)
@@ -123,6 +129,7 @@ async def learn_model(
 
 
 @router.post("/update_model")
+@log_endpoint
 async def update_model(
     model_name: str = Form(...),
     task_type: str = Form(...),
@@ -164,6 +171,7 @@ async def update_model(
 
 
 @router.post("/delete_model")
+@log_endpoint
 async def delete_model(
     model_id: str = Form(...)
 ):
@@ -181,6 +189,7 @@ async def delete_model(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/get_predictions_from_file")
+@log_endpoint
 async def get_predictions_from_file(
     model_id: str = Form(...),
     file: UploadFile = File(...)
@@ -232,6 +241,7 @@ async def get_predictions_from_file(
 
 
 @router.post("/get_model")
+@log_endpoint
 async def get_predictions_from_file(
     model_id: str = Form(...)
 ):

@@ -6,10 +6,13 @@ import pandas as pd
 from app.data_storage.mino.minio_helper import generate_datatime_uuid4_id,get_minio_client, ensure_bucket_exists
 import io
 
+from app.logger.logger import log_minio_dataset
+
 
 
 DATASETS_BUCKET = "ml-datasets"
 
+@log_minio_dataset
 def save_dataset_to_minio(dataset:pd.DataFrame, dataset_name: str) -> str:
     """
     Сохранить данные в MinIO и вернуть ID данных
@@ -60,6 +63,7 @@ def save_dataset_to_minio(dataset:pd.DataFrame, dataset_name: str) -> str:
         raise S3Error(f"Failed to save dataset to MinIO: {str(e)}")
 
 
+@log_minio_dataset
 def read_dataset_from_minio(dataset_id: str) -> bytes:
 
     """Загрузить данные из MinIO по ID"""
@@ -76,7 +80,7 @@ def read_dataset_from_minio(dataset_id: str) -> bytes:
         response.close()
         response.release_conn()
 
-
+@log_minio_dataset
 def update_dataset_to_minio(dataset:pd.DataFrame, dataset_id: str, dataset_name: str) -> str:
     """
     Сохранить данные в MinIO и вернуть ID данных
@@ -125,7 +129,7 @@ def update_dataset_to_minio(dataset:pd.DataFrame, dataset_id: str, dataset_name:
     except Exception as e:
         raise S3Error(f"Failed to save dataset to MinIO: {str(e)}")
 
-
+@log_minio_dataset
 def delete_dataset_from_minio(dataset_id: str) -> bool:
     """Удалить данные из MinIO"""
     client = get_minio_client()
