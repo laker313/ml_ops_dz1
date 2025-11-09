@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package models;
+
+service ModelService {
+  // Health и статус
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc PoolStatus(PoolStatusRequest) returns (PoolStatusResponse);
+  rpc GetModelList(ModelListRequest) returns (ModelListResponse);
+  
+  // Основные операции с моделями
+  rpc CreateAndSaveModel(CreateModelRequest) returns (CreateModelResponse);
+  rpc LearnModel(LearnModelRequest) returns (LearnModelResponse);
+  rpc UpdateModel(UpdateModelRequest) returns (UpdateModelResponse);
+  rpc DeleteModel(DeleteModelRequest) returns (DeleteModelResponse);
+  
+  // Предсказания и информация
+  rpc GetPredictionsFromFile(PredictionsRequest) returns (PredictionsResponse);
+  rpc GetModel(GetModelRequest) returns (GetModelResponse);
+  rpc GetModelHyperparameters(HyperparametersRequest) returns (HyperparametersResponse);
+}
+
+// Health и статус
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1;
+  int32 workers = 2;
+  int32 queue_size = 3;
+}
+
+message PoolStatusRequest {}
+
+message PoolStatusResponse {
+  int32 max_workers = 1;
+  int32 active = 2;
+  int32 queue = 3;
+}
+
+message ModelListRequest {}
+
+message ModelListResponse {
+  repeated string model_names = 1;
+}
+
+// Создание и обучение моделей
+message CreateModelRequest {
+  string model_name = 1;
+  string task_type = 2;
+  string hyperparameters = 3;  // JSON строка как в вашем Form(...)
+}
+
+message CreateModelResponse {
+  string status = 1;
+  string model_name = 2;
+  string hyperparameters = 3;  // JSON строка для совместимости
+  string model_type = 4;
+  string model_id = 5;
+}
+
+message LearnModelRequest {
+  string model_id = 1;
+  string data_id = 2;
+}
+
+message LearnModelResponse {
+  string status = 1;
+  string model_type = 2;
+  string model_id = 3;
+}
+
+message UpdateModelRequest {
+  string model_name = 1;
+  string task_type = 2;
+  string hyperparameters = 3;  // JSON строка
+}
+
+message UpdateModelResponse {
+  string status = 1;
+  string model_name = 2;
+  string hyperparameters = 3;  // JSON строка
+  string model_type = 4;
+  string model_id = 5;
+}
+
+message DeleteModelRequest {
+  string model_id = 1;
+}
+
+message DeleteModelResponse {
+  string status = 1;
+  string model_id = 2;
+}
+
+// Предсказания
+message PredictionsRequest {
+  string model_id = 1;
+  bytes file_content = 2;     // Содержимое файла для предсказаний
+  string file_name = 3;       // Имя файла
+}
+
+message PredictionsResponse {
+  bytes predictions_csv = 1;  // CSV с предсказаниями
+  string file_name = 2;
+}
+
+// Информация о моделях
+message GetModelRequest {
+  string model_id = 1;
+}
+
+message GetModelResponse {
+  string model_id = 1;
+  string model_name = 2;
+  string learning_status = 3;
+  string hyperparams = 4;     // JSON строка
+}
+
+message HyperparametersRequest {
+  string model_name = 1;
+  string task_type = 2;
+}
+
+message HyperparametersResponse {
+  string model_name = 1;
+  string task_type = 2;
+  map<string, string> hyperparameters = 3;  // Параметры как строки
+}

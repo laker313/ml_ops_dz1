@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package data;
+
+service DataService {
+  // Аналог /upload_dataset
+  rpc UploadDataset(UploadDatasetRequest) returns (DatasetOperationResponse);
+  
+  // Аналог /update_dataset
+  rpc UpdateDataset(UpdateDatasetRequest) returns (DatasetOperationResponse);
+  
+  // Аналог /download_dataset
+  rpc DownloadDataset(DownloadDatasetRequest) returns (DownloadDatasetResponse);
+  
+  // Аналог /delete_dataset
+  rpc DeleteDataset(DeleteDatasetRequest) returns (DatasetOperationResponse);
+}
+
+// Сообщения для UploadDataset
+message UploadDatasetRequest {
+  bytes file_content = 1;    // Содержимое файла
+  string file_name = 2;      // Имя файла
+}
+
+message DatasetOperationResponse {
+  string status = 1;         // Статус операции
+  string dataset_id = 2;     // ID датасета
+  string dataset_name = 3;   // Имя датасета
+}
+
+// Сообщения для UpdateDataset
+message UpdateDatasetRequest {
+  bytes file_content = 1;    // Новое содержимое файла
+  string file_name = 2;      // Имя файла
+  string dataset_id = 3;     // ID существующего датасета
+}
+
+// Сообщения для DownloadDataset
+message DownloadDatasetRequest {
+  string dataset_id = 1;     // ID датасета для скачивания
+}
+
+message DownloadDatasetResponse {
+  bytes dataset_content = 1; // Содержимое датасета в CSV
+  string file_name = 2;      // Имя файла для скачивания
+}
+
+// Сообщения для DeleteDataset
+message DeleteDatasetRequest {
+  string dataset_id = 1;     // ID датасета для удаления
+}
