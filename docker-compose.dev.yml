@@ -9,7 +9,7 @@ services:
       - .:/workspace
       - ./logs:/workspace/logs
     working_dir: /workspace
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: python -m app.main
     # command: sleep infinity
     environment:
       - DATABASE_URL=postgresql://developer:password@db:5432/mldb
@@ -19,16 +19,19 @@ services:
       - minio
     expose:
       - "8000"
+      - "50051"
     networks:
       - webnet
       - appnet
   nginx:
     image: nginx:alpine
     ports:
-      - "80:80"    # Единственный внешний порт
+      - "80:80"
+      - "50052:50052"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/grpc.conf.d:/etc/nginx/grpc.conf.d:ro
     depends_on:
       - app
     networks:

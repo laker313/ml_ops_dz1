@@ -1,1 +1,5 @@
-1
+Состав группы:
+Молоков Андрей
+для старта программы скачать проект с гита
+ввести
+docker compose -f 'ml_ops_dz1/docker-compose.dev.yml' up -d --build
