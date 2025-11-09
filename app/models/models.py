@@ -15,26 +15,31 @@ class Models(Enum):
 
 
 
+class Model_Type(Enum):
+    CLASSIFIER = "classifier"
+    REGRESSOR = "regressor"
+
+
 
 MODEL_CLASSES = {
     Models.CATBOOST.value: {
-        'classifier': CatBoostClassifier,
-        'regressor': CatBoostRegressor
+        Model_Type.CLASSIFIER.value: CatBoostClassifier,
+        Model_Type.REGRESSOR.value : CatBoostRegressor
     },
     Models.LIGHTGBM.value: {
-        'classifier': LGBMClassifier, 
-        'regressor': LGBMRegressor
+        Model_Type.CLASSIFIER.value : LGBMClassifier, 
+        Model_Type.REGRESSOR.value : LGBMRegressor
     },
     Models.XGBOOST.value: {
-        'classifier': XGBClassifier,
-        'regressor': XGBRegressor
+        Model_Type.CLASSIFIER.value: XGBClassifier,
+        Model_Type.REGRESSOR.value : XGBRegressor
     },
     Models.RANDOM_FOREST.value: {
-        'classifier': RandomForestClassifier,
-        'regressor': RandomForestRegressor
+        Model_Type.CLASSIFIER.value : RandomForestClassifier,
+        Model_Type.REGRESSOR.value : RandomForestRegressor
     },
     Models.LINEAR_REGRESSION.value: {
-        'regressor': LinearRegression,
-        'classifier': LogisticRegression
+        Model_Type.REGRESSOR.value : LinearRegression,
+        Model_Type.CLASSIFIER.value : LogisticRegression
     }
 }
