@@ -28,9 +28,7 @@ def save_model_to_minio(model, model_name: str, hyperparameters: dict) -> str:
     Сохранить модель в MinIO и вернуть ID модели
     """
     client = get_minio_client()
-    
-    # Создаем бакет если нужно
-    ensure_bucket_exists(client, MODEL_BUCKET)
+
     
     # Генерируем уникальный ID для модели
     model_id = generate_datatime_uuid4_id()
@@ -111,9 +109,6 @@ def update_model_to_minio(model, model_id: str, model_name: str, hyperparameters
     Сохранить модель в MinIO и вернуть ID модели
     """
     client = get_minio_client()
-    
-    # Создаем бакет если нужно
-    ensure_bucket_exists(client, MODEL_BUCKET)
     
     # Генерируем уникальный ID для модели
     object_name = f"{model_id}.pkl"

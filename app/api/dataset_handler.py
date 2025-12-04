@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Dict, Any
 from pydantic import BaseModel
 import pandas as pd
-from app.data_storage.mino.datasets_storage import save_dataset_to_minio, update_dataset_to_minio
+from app.data_storage.mino.datasets_storage import get_all_version_dataset_from_minio, save_dataset_to_minio, update_dataset_to_minio
 import io
 from app.data_storage.mino.datasets_storage import delete_dataset_from_minio, read_dataset_from_minio
 from app.api.utils import async_run_in_pool
@@ -149,6 +149,48 @@ async def download_dataset(
                 "Content-Disposition": f"attachment; filename={dataset_id}.csv"
             }
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+# @router.post("/download_dataset_with_version")
+@log_endpoint
+async def download_dataset_with_version(
+    dataset_id: str = Form(...),
+    version: str = Form(...)
+):
+    """Загрузить набор данных в хранилище"""
+    try:
+        # Читаем файл
+        dataset_bytes = await async_run_in_pool(read_dataset_from_minio, dataset_id, version)
+                # Конвертируем parquet в pandas DataFrame
+        dataset = pd.read_parquet(io.BytesIO(dataset_bytes))
+        
+        # Конвертируем DataFrame в CSV
+        csv_bytes = io.BytesIO()
+        dataset.to_csv(csv_bytes, index=False)
+        csv_bytes.seek(0)
+        
+        return Response(
+            content=csv_bytes.getvalue(),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={dataset_id}.csv"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# @router.post("/download_dataset_with_version")
+@log_endpoint
+async def get_dataset_version_list(
+    dataset_id: str = Form(...)
+):
+    """Загрузить набор данных в хранилище"""
+    try:
+        # Читаем файл
+        version_list_str = await async_run_in_pool(get_all_version_dataset_from_minio, dataset_id)
+        return {"version_list": version_list_str}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

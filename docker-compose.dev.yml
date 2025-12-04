@@ -14,6 +14,16 @@ services:
     environment:
       - DATABASE_URL=postgresql://developer:password@db:5432/mldb
       - MINIO_ENDPOINT=minio:9000
+      - CLEARML_WEB_HOST=https://app.clear.ml/
+      - CLEARML_API_HOST=https://api.clear.ml
+      - CLEARML_FILES_HOST=https://files.clear.ml
+      - CLEARML_API_ACCESS_KEY=QC5OFNEX5P4DFHMNSCIWMT5CD1Y5GG
+      - CLEARML_API_SECRET_KEY=Ihi4R6l8lxhrocwF5mt4J_8oYRJEP5pWhzFH8KQY30XoEzRe-Qf_Bre7cO3jk-quOdE
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_REGION=us-east-1
+      - CLEARML_DEFAULT_OUTPUT_URI=s3://ml-models
+      - S3_ENDPOINT_URL=http://minio:9000
     depends_on:
       - db
       - minio

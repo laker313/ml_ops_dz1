@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from app.api.models_handler import router as models_router
 from app.api.dataset_handler import router as dataset_router
 from app.logger.logger import setup_logging
+from app.data_storage.mino.minio_init import lifespan
 
 # gRPC сервисы
 from app.proto import grpc_dataset_handler_pb2_grpc, grpc_model_handler_pb2_grpc
@@ -25,7 +26,8 @@ app = FastAPI(
     title=PROJECT_NAME,
     openapi_url=f"{API_V1_STR}/openapi.json",
     max_upload_size=500 * 1024 * 1024,  # 500MB
-    max_response_size=500 * 1024 * 1024  # 500MB
+    max_response_size=500 * 1024 * 1024, # 500MB
+    lifespan=lifespan
 )
 
 # Подключаем роутеры
