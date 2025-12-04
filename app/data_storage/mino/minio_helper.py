@@ -3,6 +3,8 @@ from minio import Minio
 import uuid
 from datetime import datetime
 from fastapi import HTTPException
+from minio.versioningconfig import VersioningConfig, ENABLED
+
 
 MINIO_CONFIG = {
     "endpoint": "minio:9000",
@@ -28,6 +30,14 @@ def ensure_bucket_exists(client: Minio, bucket_name: str):
         if not client.bucket_exists(bucket_name):
             client.make_bucket(bucket_name)
             print(f"Bucket '{bucket_name}' created")
+    except S3Error as e:
+        raise HTTPException(500, f"MinIO error: {str(e)}")
+    
+
+def set_bucket_versioning(client: Minio, bucket_name: str):
+    """Убедиться, что бакет существует"""
+    try:
+        client.set_bucket_versioning(bucket_name, VersioningConfig(ENABLED))
     except S3Error as e:
         raise HTTPException(500, f"MinIO error: {str(e)}")
     

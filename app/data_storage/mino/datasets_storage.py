@@ -20,9 +20,6 @@ def save_dataset_to_minio(dataset:pd.DataFrame, dataset_name: str) -> str:
     client = get_minio_client()
 
     
-    # Создаем бакет если нужно
-    ensure_bucket_exists(client, DATASETS_BUCKET)
-    
     # Генерируем уникальный ID для датасета
     dataset_id = generate_datatime_uuid4_id()
     object_name = f"{dataset_id}.parquet"
@@ -64,14 +61,41 @@ def save_dataset_to_minio(dataset:pd.DataFrame, dataset_name: str) -> str:
 
 
 @log_minio_dataset
-def read_dataset_from_minio(dataset_id: str) -> bytes:
+def read_dataset_from_minio(dataset_id: str, version = "") -> bytes:
 
     """Загрузить данные из MinIO по ID"""
     client = get_minio_client()
-    response  = client.get_object(DATASETS_BUCKET, f"{dataset_id}.parquet")
+    if version:
+        response  = client.get_object(DATASETS_BUCKET, f"{dataset_id}.parquet", version_id=version)
+    else:
+        response  = client.get_object(DATASETS_BUCKET, f"{dataset_id}.parquet")
     
     try:
         return response.read()
+    except Exception as e:
+        raise S3Error(f"Failed to read dataset from MinIO: {str(e)}")
+
+    
+    finally:
+        response.close()
+        response.release_conn()
+
+
+@log_minio_dataset
+def get_all_version_dataset_from_minio(dataset_id: str) -> bytes:
+
+    client = get_minio_client()
+
+
+    try:
+        response  = client.list_objects(DATASETS_BUCKET, f"{dataset_id}.parquet", versions=True, recursive=True,)
+        info_lines = "Сверху вниз - от новых к старым версиям:\n"
+
+        for obj in response:
+            line = f"Имя: {obj.object_name}, Версия: {obj.version_id}, Удалён: {obj.is_delete_marker}"
+            info_lines.append(line)
+        return "\n".join(info_lines)
+
     except Exception as e:
         raise S3Error(f"Failed to read dataset from MinIO: {str(e)}")
 
@@ -86,10 +110,6 @@ def update_dataset_to_minio(dataset:pd.DataFrame, dataset_id: str, dataset_name:
     Сохранить данные в MinIO и вернуть ID данных
     """
     client = get_minio_client()
-
-    
-    # Создаем бакет если нужно
-    ensure_bucket_exists(client, DATASETS_BUCKET)
     
     # Генерируем уникальный ID для датасета
     object_name = f"{dataset_id}.parquet"
